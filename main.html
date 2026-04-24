@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Piano Rush</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #0f0f13; min-height: 100vh; display: flex; align-items: center; justify-content: center; color: #fff; }
+    .wrap { width: 100%; max-width: 560px; padding: 2rem 1.5rem; text-align: center; }
+    .screen { display: none; } .screen.active { display: block; }
+    .logo { font-size: 34px; font-weight: 800; letter-spacing: -1.5px; margin-bottom: 6px; background: linear-gradient(90deg,#fff 40%,#a29bfe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .tagline { font-size: 14px; color: #666; margin-bottom: 1.5rem; line-height: 1.7; }
+    .hud { display: flex; justify-content: center; gap: 10px; margin-bottom: .9rem; }
+    .hc { background: #1a1a24; border: 1px solid #2a2a38; border-radius: 12px; padding: 8px 18px; text-align: center; }
+    .hv { font-size: 18px; font-weight: 700; color: #fff; }
+    .hl { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: .07em; margin-top: 2px; }
+    .status { font-size: 16px; font-weight: 600; color: #fff; min-height: 24px; margin-bottom: 3px; }
+    .sub { font-size: 12px; color: #555; margin-bottom: .5rem; min-height: 16px; }
+    .seq-dots { display: flex; justify-content: center; gap: 4px; margin-bottom: .7rem; flex-wrap: wrap; min-height: 12px; }
+    .sdot { width: 9px; height: 9px; border-radius: 50%; background: #2a2a38; transition: background .2s; }
+    .sdot.done   { background: #0be881; }
+    .sdot.active { background: #a29bfe; box-shadow: 0 0 5px #a29bfe; }
+    .sdot.wrong  { background: #ff4e4e; }
+    .progress-bar { height: 4px; background: #2a2a38; border-radius: 3px; margin: 0 0 .7rem; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #a29bfe, #0be881); border-radius: 3px; transition: width .5s; }
+    .piano-outer { background: #1a1a24; border: 1px solid #2a2a38; border-radius: 10px 10px 0 0; padding: 12px 14px 0; display: inline-block; }
+    .piano-wrap  { position: relative; display: inline-block; user-select: none; }
+    .white-keys  { display: flex; gap: 3px; }
+    .wkey {
+      width: 42px; height: 145px; background: #f0ece4;
+      border-radius: 0 0 7px 7px; border: 1px solid #ccc; border-top: 2px solid #bbb;
+      cursor: pointer; display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 8px; font-size: 11px; font-weight: 600; color: #bbb; position: relative;
+      transition: background .08s, transform .06s;
+    }
+    .wkey:hover { background: #e8e4dc; }
+    .wkey.lit         { background: #a29bfe !important; color: #fff; box-shadow: 0 0 28px #a29bfebb; }
+    .wkey.lit-new     { background: #ff9f43 !important; color: #fff; box-shadow: 0 0 36px #ff9f43cc; }
+    .wkey.lit-waiting { background: #ff9f43 !important; color: #fff; box-shadow: 0 0 40px #ff9f43ee; animation: pulse-key 0.8s ease-in-out infinite; }
+    .wkey.correct     { background: #0be881 !important; color: #fff; box-shadow: 0 0 16px #0be88188; }
+    .wkey.wrong-key   { background: #ff4e4e !important; color: #fff; }
+    .wkey.pressed     { transform: scaleY(0.96); }
+    .wkey.dim         { background: #1e1c20 !important; cursor: not-allowed; color: #333; border-color: #2a2838; }
+    @keyframes pulse-key { 0%,100%{ box-shadow: 0 0 28px #ff9f43aa; } 50%{ box-shadow: 0 0 52px #ff9f43ff; } }
+    .bkey {
+      width: 26px; height: 92px; background: #18181f;
+      border-radius: 0 0 5px 5px; border: 1px solid #2a2a38;
+      cursor: default; position: absolute; top: 0; z-index: 2;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 5px; font-size: 9px; font-weight: 600; color: #333;
+    }
+    .piano-stand { width: 75%; height: 11px; background: #1a1a24; border-radius: 0 0 6px 6px; margin: 0 auto; border: 1px solid #2a2a38; border-top: none; }
+    .tap-hint { font-size: 13px; font-weight: 600; color: #ff9f43; min-height: 20px; margin-bottom: 4px; animation: blink 1s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{ opacity:1; } 50%{ opacity:0.4; } }
+    .song-card { background: #1a1a24; border: 1px solid #2a2a38; border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; cursor: pointer; transition: border-color .15s; text-align: left; display: flex; align-items: center; gap: 12px; }
+    .song-card:hover { border-color: #a29bfe55; }
+    .song-card.selected { border-color: #a29bfe; background: #1e1b30; }
+    .song-icon  { font-size: 22px; width: 30px; text-align: center; flex-shrink: 0; }
+    .song-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 2px; }
+    .song-meta  { font-size: 11px; color: #555; }
+    .song-name-tag { display: inline-block; background: #1a1a24; border: 1px solid #2a2a38; border-radius: 8px; padding: 3px 12px; font-size: 11px; color: #888; margin-bottom: .5rem; }
+    .btn { display: inline-block; border: none; border-radius: 12px; padding: 12px 34px; font-size: 14px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif; transition: transform .1s, opacity .1s; margin-top: 6px; }
+    .btn:hover { transform: scale(1.04); opacity: .92; }
+    .btn-p { background: linear-gradient(135deg, #a29bfe, #6c5ce7); color: #fff; }
+    .btn-s { background: #1a1a24; border: 1px solid #2a2a38; color: #aaa; font-size: 13px; padding: 10px 18px; margin-left: 8px; }
+    .btn-s:hover { border-color: #555; color: #fff; }
+    .level-up { font-size: 12px; color: #0be881; font-weight: 600; min-height: 16px; opacity: 0; transition: opacity .3s; margin-bottom: 2px; }
+    .level-up.show { opacity: 1; }
+    .countdown-box { font-size: 56px; font-weight: 800; min-height: 70px; line-height: 1; margin-bottom: 4px; }
+    .result-emoji { font-size: 48px; margin-bottom: 10px; }
+    .result-title { font-size: 26px; font-weight: 800; color: #fff; margin-bottom: 6px; }
+    .result-sub   { font-size: 14px; color: #888; margin-bottom: 1.2rem; line-height: 1.6; }
+    .badge { display: inline-block; border-radius: 8px; padding: 4px 14px; font-size: 12px; font-weight: 600; margin-bottom: .8rem; margin-right: 6px; }
+    .badge-win  { background: rgba(11,232,129,.12); border: 1px solid rgba(11,232,129,.35); color: #0be881; }
+    .badge-best { background: rgba(162,155,254,.12); border: 1px solid rgba(162,155,254,.35); color: #a29bfe; }
+    .how { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+    .how-step { background: #1a1a24; border: 1px solid #2a2a38; border-radius: 8px; padding: 6px 12px; font-size: 11px; color: #666; }
+    .how-step span { color: #fff; font-weight: 600; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HOME -->
+  <div id="s-home" class="screen active">
+    <div style="font-size:48px;margin-bottom:10px;">🎹</div>
+    <div class="logo">Piano Rush</div>
+    <div class="tagline">The song plays from note 1 each round, adding one new note.<br>Repeat it back — that's how you learn the whole melody!</div>
+    <div class="how">
+      <div class="how-step"><span>Round 1:</span> 1 note</div>
+      <div class="how-step"><span>Round 2:</span> 2 notes</div>
+      <div class="how-step"><span>Round 3:</span> 3 notes</div>
+      <div class="how-step"><span>...</span> full song!</div>
+    </div>
+    <div class="song-card selected" id="sc-twinkle" onclick="selectSong('twinkle',this)">
+      <div class="song-icon">⭐</div>
+      <div><div class="song-title">Twinkle Twinkle</div><div class="song-meta">14 notes · Beginner</div></div>
+    </div>
+    <div class="song-card" id="sc-mary" onclick="selectSong('mary',this)">
+      <div class="song-icon">🐑</div>
+      <div><div class="song-title">Mary Had a Little Lamb</div><div class="song-meta">13 notes · Beginner</div></div>
+    </div>
+    <div class="song-card" id="sc-happy" onclick="selectSong('happy',this)">
+      <div class="song-icon">🎂</div>
+      <div><div class="song-title">Happy Birthday</div><div class="song-meta">16 notes · Easy</div></div>
+    </div>
+    <div class="song-card" id="sc-ode" onclick="selectSong('ode',this)">
+      <div class="song-icon">🎵</div>
+      <div><div class="song-title">Ode to Joy</div><div class="song-meta">15 notes · Medium</div></div>
+    </div>
+    <button class="btn btn-p" onclick="startGame()">Start learning</button>
+  </div>
+
+  <!-- GAME -->
+  <div id="s-game" class="screen">
+    <div class="hud">
+      <div class="hc"><div class="hv" id="hud-round">1</div><div class="hl">Round</div></div>
+      <div class="hc"><div class="hv" id="hud-prog">1/14</div><div class="hl">Notes</div></div>
+      <div class="hc"><div class="hv" id="hud-lives">❤️❤️❤️</div><div class="hl">Lives</div></div>
+    </div>
+    <div class="level-up" id="level-up">+1 note added!</div>
+    
+    <div class="song-name-tag" id="song-name-tag"></div>
+    <div class="countdown-box" id="countdown-box"></div>
+    <div class="status" id="status"></div>
+    <div class="tap-hint" id="tap-hint"></div>
+    <div class="sub" id="sub"></div>
+    <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+    <div class="seq-dots" id="seq-dots"></div>
+    <div style="text-align:center;">
+      <div class="piano-outer">
+        <div class="piano-wrap" id="piano-wrap"></div>
+      </div>
+      <div class="piano-stand"></div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div id="s-over" class="screen">
+    <div class="result-emoji" id="res-emoji">🎹</div>
+    <div class="result-title" id="res-title"></div>
+    <div class="result-sub"   id="res-sub"></div>
+    <div class="hud">
+      <div class="hc"><div class="hv" id="res-round"></div><div class="hl">Round reached</div></div>
+      <div class="hc"><div class="hv" id="res-notes"></div><div class="hl">Notes learned</div></div>
+    </div>
+    <div id="badge-win"  class="badge badge-win"  style="display:none;">Song complete!</div>
+    <div id="badge-best" class="badge badge-best" style="display:none;"></div>
+    <br>
+    <button class="btn btn-p" onclick="startGame()">Try again</button>
+    <button class="btn btn-s" onclick="show('s-home')">Home</button>
+  </div>
+
+</div>
+<script>
+  const NOTES_DEF = [
+    {id:'C4', label:'C', type:'white', freq:261.63},
+    {id:'Cs4',label:'C#',type:'black', freq:277.18},
+    {id:'D4', label:'D', type:'white', freq:293.66},
+    {id:'Ds4',label:'D#',type:'black', freq:311.13},
+    {id:'E4', label:'E', type:'white', freq:329.63},
+    {id:'F4', label:'F', type:'white', freq:349.23},
+    {id:'Fs4',label:'F#',type:'black', freq:369.99},
+    {id:'G4', label:'G', type:'white', freq:392.00},
+    {id:'Gs4',label:'G#',type:'black', freq:415.30},
+    {id:'A4', label:'A', type:'white', freq:440.00},
+    {id:'As4',label:'A#',type:'black', freq:466.16},
+    {id:'B4', label:'B', type:'white', freq:493.88},
+    {id:'C5', label:'C', type:'white', freq:523.25},
+  ];
+  const WHITE = NOTES_DEF.filter(n => n.type === 'white');
+  const BLACK = NOTES_DEF.filter(n => n.type === 'black');
+  const BLACK_OFF = { 'Cs4':1, 'Ds4':2, 'Fs4':4, 'Gs4':5, 'As4':6 };
+  const NOTE_BY_ID = {}; NOTES_DEF.forEach(n => NOTE_BY_ID[n.id] = n);
+  const WHITE_IDX  = {}; WHITE.forEach((n,i) => WHITE_IDX[n.id] = i);
+
+  const SONGS = {
+    twinkle: { name:'Twinkle Twinkle',        tempo:700, notes:['C4','C4','G4','G4','A4','A4','G4','F4','F4','E4','E4','D4','D4','C4'] },
+    mary:    { name:'Mary Had a Little Lamb',  tempo:650, notes:['E4','D4','C4','D4','E4','E4','E4','D4','D4','D4','E4','G4','G4'] },
+    happy:   { name:'Happy Birthday',          tempo:680, notes:['C4','C4','D4','C4','F4','E4','C4','C4','D4','C4','G4','F4','C4','C4','C5','A4'] },
+    ode:     { name:'Ode to Joy',              tempo:660, notes:['E4','E4','F4','G4','G4','F4','E4','D4','C4','C4','D4','E4','E4','D4','D4'] },
+  };
+
+  let selectedSong='twinkle', round=0, playerIdx=0, locked=true, lives=3, bestRound=0, audioCtx=null;
+  let songSeq=[], waitingForFirst=false, firstNoteId=null;
+
+  function selectSong(s,el){
+    selectedSong=s;
+    document.querySelectorAll('.song-card').forEach(c=>c.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function audio(){
+    if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  function playNote(freq,dur=400,vol=0.3){
+    try{
+      const c=audio();
+      [[c.createOscillator(),'triangle',vol*0.65,freq],
+       [c.createOscillator(),'sine',    vol*0.45,freq],
+       [c.createOscillator(),'sine',    vol*0.1, freq*2]
+      ].forEach(([o,type,v,f])=>{
+        const g=c.createGain(); o.connect(g); g.connect(c.destination);
+        o.type=type; o.frequency.value=f;
+        const t=c.currentTime;
+        g.gain.setValueAtTime(0,t);
+        g.gain.linearRampToValueAtTime(v,t+0.009);
+        g.gain.setValueAtTime(v*0.7,t+0.06);
+        g.gain.exponentialRampToValueAtTime(0.001,t+dur/1000);
+        o.start(t); o.stop(t+dur/1000);
+      });
+    }catch(e){}
+  }
+
+  function chime(){
+    [523.25,659.25,783.99,1046.5].forEach((f,i)=>{
+      try{
+        const c=audio(),o=c.createOscillator(),g=c.createGain();
+        o.connect(g); g.connect(c.destination); o.type='sine'; o.frequency.value=f;
+        g.gain.setValueAtTime(0.14,c.currentTime+i*.1);
+        g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+i*.1+.32);
+        o.start(c.currentTime+i*.1); o.stop(c.currentTime+i*.1+.36);
+      }catch(e){}
+    });
+  }
+
+  function buzz(){
+    [180,130].forEach((f,i)=>{
+      try{
+        const c=audio(),o=c.createOscillator(),g=c.createGain();
+        o.connect(g); g.connect(c.destination); o.type='sawtooth'; o.frequency.value=f;
+        g.gain.setValueAtTime(0.14,c.currentTime+i*.2);
+        g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+i*.2+.28);
+        o.start(c.currentTime+i*.2); o.stop(c.currentTime+i*.2+.3);
+      }catch(e){}
+    });
+  }
+
+  function show(id){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+  function setStatus(m,s){
+    document.getElementById('status').textContent=m;
+    document.getElementById('sub').textContent=s||'';
+  }
+  function setTapHint(txt){ document.getElementById('tap-hint').textContent=txt; }
+  function setCountdown(txt){ document.getElementById('countdown-box').textContent=txt; }
+
+  function buildPiano(){
+    const wrap=document.getElementById('piano-wrap'); wrap.innerHTML='';
+    const wRow=document.createElement('div'); wRow.className='white-keys';
+    WHITE.forEach(n=>{
+      const k=document.createElement('div');
+      k.className='wkey'; k.id='key-'+n.id; k.textContent=n.label;
+      k.addEventListener('mousedown',e=>{e.preventDefault();playerPress(n.id);});
+      k.addEventListener('touchstart',e=>{e.preventDefault();playerPress(n.id);},{passive:false});
+      wRow.appendChild(k);
+    });
+    wrap.appendChild(wRow);
+    const bRow=document.createElement('div');
+    bRow.style.cssText='position:absolute;top:0;left:0;width:100%;';
+    BLACK.forEach(n=>{
+      const wi=BLACK_OFF[n.id]; if(wi===undefined) return;
+      const k=document.createElement('div');
+      k.className='bkey'; k.id='key-'+n.id; k.textContent=n.label;
+      k.style.left=(wi*45-12)+'px';
+      bRow.appendChild(k);
+    });
+    wrap.appendChild(bRow);
+  }
+
+  function setKeyClass(id, cls){
+    const k=document.getElementById('key-'+id); if(!k) return;
+    k.className='wkey '+cls;
+  }
+  function litKey(id,cls,dur){
+    const k=document.getElementById('key-'+id); if(!k) return;
+    k.classList.add(cls); setTimeout(()=>k.classList.remove(cls),dur);
+  }
+  function clearKeyClass(id,...classes){
+    const k=document.getElementById('key-'+id); if(!k) return;
+    classes.forEach(c=>k.classList.remove(c));
+  }
+  function dimAll(d){
+    WHITE.forEach(n=>{
+      const k=document.getElementById('key-'+n.id);
+      if(k){k.classList.toggle('dim',d); k.style.pointerEvents=d?'none':'auto';}
+    });
+  }
+  function buildDots(){
+    const c=document.getElementById('seq-dots'); c.innerHTML='';
+    for(let i=0;i<songSeq.length;i++){
+      const d=document.createElement('div'); d.className='sdot'; d.id='sdot-'+i; c.appendChild(d);
+    }
+  }
+  function updateDots(idx,wrong=false){
+    for(let i=0;i<songSeq.length;i++){
+      const d=document.getElementById('sdot-'+i); if(!d) continue;
+      if(i<idx)         d.className='sdot done';
+      else if(i===idx)  d.className='sdot'+(wrong?' wrong':' active');
+      else              d.className='sdot';
+    }
+  }
+  function updateProgress(){
+    const song=SONGS[selectedSong];
+    const pct=Math.round((songSeq.length/song.notes.length)*100);
+    document.getElementById('prog-fill').style.width=pct+'%';
+    document.getElementById('hud-prog').textContent=songSeq.length+'/'+song.notes.length;
+  }
+  function updateLives(){
+    document.getElementById('hud-lives').textContent='❤️'.repeat(lives)+'🖤'.repeat(Math.max(0,3-lives));
+  }
+
+  function startGame(){
+    const song=SONGS[selectedSong];
+    round=0; playerIdx=0; locked=true; lives=3; bestRound=0; waitingForFirst=false; firstNoteId=null;
+    songSeq=[WHITE_IDX[song.notes[0]]];
+    show('s-game');
+    document.getElementById('song-name-tag').textContent=song.name;
+    
+    setCountdown(''); setTapHint('');
+    buildPiano(); updateLives(); updateProgress();
+    document.getElementById('prog-fill').style.width='0%';
+    countdown(()=>playRound());
+  }
+
+  function countdown(cb){
+    setStatus('Get ready...','');
+    setCountdown('3');
+    setTimeout(()=>setCountdown('2'),1000);
+    setTimeout(()=>setCountdown('1'),2000);
+    setTimeout(()=>{ setCountdown('🎵'); setTimeout(()=>{ setCountdown(''); cb(); },400); },3000);
+  }
+  function playRound(){
+    round++;
+    document.getElementById('hud-round').textContent=round;
+    if(round>1){
+      const lu=document.getElementById('level-up');
+      lu.classList.add('show'); setTimeout(()=>lu.classList.remove('show'),900);
+    }
+    buildDots(); dimAll(true); locked=true; playerIdx=0; waitingForFirst=false;
+    setStatus('Listen carefully...','Watch every key carefully!');
+    setTapHint('');
+    const song=SONGS[selectedSong];
+    const spd=Math.max(500,song.tempo-round*10);
+    const gap=spd+120;
+
+    songSeq.forEach((ki,i)=>{
+      const isNew=(i===songSeq.length-1 && round>1);
+      const glowCls='lit';
+      setTimeout(()=>{
+        const nid=WHITE[ki].id;
+        litKey(nid,glowCls,spd);
+        playNote(NOTE_BY_ID[nid].freq,spd-60);
+      },i*gap);
+    });
+
+    // after all notes played, show first note waiting
+    const totalPlayTime=songSeq.length*gap+200;
+    setTimeout(()=>{
+      dimAll(false);
+      locked=false;
+      playerIdx=0;
+      waitingForFirst=(round===1);
+      firstNoteId=WHITE[songSeq[0]].id;
+      // keep first note glowing until tapped
+      if(round===1) setKeyClass(firstNoteId,'wkey lit-waiting');
+      buildDots();
+      updateDots(0);
+      setStatus("Your turn!",'');
+      setTapHint(round===1?'Tap the glowing key to start!':'');
+    },totalPlayTime);
+  }
+
+  function playerPress(noteId){
+    if(locked) return;
+    if(NOTE_BY_ID[noteId].type==='black') return;
+
+    // if waiting for first note tap
+    if(waitingForFirst){
+      if(noteId!==firstNoteId){
+        // wrong first tap
+        litKey(noteId,'wrong-key',300);
+        buzz();
+        return;
+      }
+      // correct first tap — clear waiting state, play sound, continue
+      waitingForFirst=false;
+      setTapHint('');
+      clearKeyClass(firstNoteId,'lit-waiting');
+      playNote(NOTE_BY_ID[noteId].freq,220);
+      litKey(noteId,'correct',300);
+      updateDots(1);
+      playerIdx=1;
+      if(songSeq.length===1){
+        // only one note in sequence — round complete
+        locked=true; dimAll(true);
+        if(round>bestRound) bestRound=round;
+        const song=SONGS[selectedSong];
+        chime();
+        if(songSeq.length>=song.notes.length){
+          document.getElementById('prog-fill').style.width='100%';
+          setTimeout(()=>showOver(true),700);
+        } else {
+          const nextNoteId=song.notes[songSeq.length];
+          
+          songSeq.push(WHITE_IDX[nextNoteId]);
+          updateProgress();
+          setStatus('Perfect!','');
+          setTimeout(playRound,1800);
+        }
+      }
+      return;
+    }
+
+    // normal tap
+    const freq=NOTE_BY_ID[noteId].freq;
+    playNote(freq,220);
+    const wi=WHITE_IDX[noteId];
+    litKey(noteId,'pressed',100);
+
+    if(wi===songSeq[playerIdx]){
+      litKey(noteId,'correct',280);
+      updateDots(playerIdx+1);
+      playerIdx++;
+
+      if(playerIdx===songSeq.length){
+        locked=true; dimAll(true);
+        if(round>bestRound) bestRound=round;
+        const song=SONGS[selectedSong];
+        chime();
+        if(songSeq.length>=song.notes.length){
+          document.getElementById('prog-fill').style.width='100%';
+          setStatus('','');
+          setTimeout(()=>showOver(true),700);
+        } else {
+          const nextNoteId=song.notes[songSeq.length];
+          
+          songSeq.push(WHITE_IDX[nextNoteId]);
+          updateProgress();
+          setStatus('Perfect!','');
+          setTimeout(playRound,1800);
+        }
+      }
+    } else {
+      litKey(noteId,'wrong-key',380);
+      updateDots(playerIdx,true);
+      buzz();
+      lives--; updateLives();
+      if(lives<=0){
+        locked=true; dimAll(true);
+        setStatus('No lives left!','');
+        setTimeout(()=>showOver(false),1200);
+      } else {
+        setStatus(`Wrong! ${lives} life${lives>1?'ves':''} left`,'Replaying the sequence...');
+        locked=true; dimAll(true);
+        setTapHint('');
+        setTimeout(playRound,1800);
+      }
+    }
+  }
+
+  function showOver(won){
+    const song=SONGS[selectedSong];
+    document.getElementById('res-emoji').textContent=won?'🎉':'🎹';
+    document.getElementById('res-title').textContent=won?'Song Complete!':'Game Over';
+    document.getElementById('res-sub').textContent=won
+      ?`You learned "${song.name}" from start to finish!`
+      :`You reached round ${round} and learned ${songSeq.length} of ${song.notes.length} notes.`;
+    document.getElementById('res-round').textContent=round;
+    document.getElementById('res-notes').textContent=songSeq.length+'/'+song.notes.length;
+    document.getElementById('badge-win').style.display=won?'inline-block':'none';
+    const bb=document.getElementById('badge-best');
+    if(!won&&round>=bestRound&&round>1){bb.textContent='Best: '+bestRound+' rounds';bb.style.display='inline-block';}
+    else bb.style.display='none';
+    show('s-over');
+  }
+</script>
+</body>
+</html>
